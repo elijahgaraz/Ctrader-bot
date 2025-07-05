@@ -18,11 +18,11 @@ class OpenAPISettings:
     # This is NOT the same as client_id (which is for the application).
     default_ctid_trader_account_id: Optional[int] = None # Store as int if it's numeric
 
-    # The following may not be strictly needed if OpenApiPy handles auth internally via Proto messages
-    # and doesn't require a separate HTTP OAuth step for session tokens.
-    # Kept for now in case there's an initial setup step or alternative auth.
-    auth_url: Optional[str] = None # e.g., "https://connect.spotware.com/apps/auth" (Potentially Obsolete)
-    token_url: Optional[str] = None # e.g., "https://connect.spotware.com/apps/token" (Potentially Obsolete)
+    # OAuth2 specific URLs
+    # These are the standard Spotware OAuth endpoints.
+    spotware_auth_url: str = "https://connect.spotware.com/oauth/v2/auth"
+    spotware_token_url: str = "https://connect.spotware.com/oauth/v2/token"
+    redirect_uri: str = "http://localhost:5000/callback" # As specified
 
 
 @dataclass
@@ -69,9 +69,9 @@ class Settings:
             client_secret=client_secret,
             host_type=openapi_cfg.get("host_type", "demo").lower(), # Ensure lowercase "demo" or "live"
             default_ctid_trader_account_id=openapi_cfg.get("default_ctid_trader_account_id"),
-            # Load potentially obsolete URLs, they will be None if not in config and no default given here
-            auth_url=openapi_cfg.get("auth_url"),
-            token_url=openapi_cfg.get("token_url")
+            spotware_auth_url=openapi_cfg.get("spotware_auth_url", "https://connect.spotware.com/oauth/v2/auth"),
+            spotware_token_url=openapi_cfg.get("spotware_token_url", "https://connect.spotware.com/oauth/v2/token"),
+            redirect_uri=openapi_cfg.get("redirect_uri", "http://localhost:5000/callback") # Should generally not be overridden from config
         )
 
         general_settings = GeneralSettings(
@@ -89,10 +89,12 @@ class Settings:
             "client_secret": self.openapi.client_secret if not os.environ.get("CTRADER_CLIENT_SECRET") else None,
             "host_type": self.openapi.host_type,
             "default_ctid_trader_account_id": self.openapi.default_ctid_trader_account_id,
-            "auth_url": self.openapi.auth_url, # Save if present, might be obsolete
-            "token_url": self.openapi.token_url, # Save if present, might be obsolete
+            "spotware_auth_url": self.openapi.spotware_auth_url,
+            "spotware_token_url": self.openapi.spotware_token_url,
+            "redirect_uri": self.openapi.redirect_uri # Typically not changed by user, but saved for completeness
         }
         # Filter out None values to keep config clean, especially for secrets from env
+        # For the new URLs, they have defaults, so they won't be None unless explicitly set to None (which is unlikely)
         openapi_data_to_save = {k: v for k, v in openapi_data_to_save.items() if v is not None}
 
         if openapi_data_to_save.get("client_id") or openapi_data_to_save.get("client_secret"):
