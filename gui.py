@@ -1,6 +1,7 @@
 import time
 import threading
 import tkinter as tk
+import queue
 from tkinter import ttk, messagebox
 from trading import Trader  # adjust import path if needed
 from strategies import (
@@ -45,33 +46,11 @@ class SettingsPage(ttk.Frame):
         self.columnconfigure(0, weight=1)
 
         # --- Login Settings ---
-        creds = ttk.Labelframe(self, text="Login Settings", padding=10)
-        creds.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-        creds.columnconfigure(1, weight=1)
-
-        ttk.Label(creds, text="Host:").grid(row=0, column=0, sticky="w", padx=(0,5))
-        self.host_var = tk.StringVar()
-        ttk.Entry(creds, textvariable=self.host_var).grid(row=0, column=1, sticky="ew")
-
-        ttk.Label(creds, text="Port:").grid(row=1, column=0, sticky="w", padx=(0,5))
-        self.port_var = tk.IntVar()
-        ttk.Entry(creds, textvariable=self.port_var).grid(row=1, column=1, sticky="ew")
-
-        ttk.Label(creds, text="SenderCompID:").grid(row=2, column=0, sticky="w", padx=(0,5))
-        self.sender_var = tk.StringVar()
-        ttk.Entry(creds, textvariable=self.sender_var).grid(row=2, column=1, sticky="ew")
-
-        ttk.Label(creds, text="TargetCompID:").grid(row=3, column=0, sticky="w", padx=(0,5))
-        self.target_var = tk.StringVar()
-        ttk.Entry(creds, textvariable=self.target_var).grid(row=3, column=1, sticky="ew")
-
-        ttk.Label(creds, text="Password:").grid(row=4, column=0, sticky="w", padx=(0,5))
-        self.password_var = tk.StringVar()
-        ttk.Entry(creds, textvariable=self.password_var, show="*").grid(row=4, column=1, sticky="ew")
-
         # --- Account Summary ---
+        # Login settings are now primarily handled by config.json and environment variables
+        # for the cTrader OpenAPI connection.
         acct = ttk.Labelframe(self, text="Account Summary", padding=10)
-        acct.grid(row=1, column=0, sticky="ew", pady=(0,10))
+        acct.grid(row=0, column=0, sticky="ew", pady=(0,10)) # Changed row from 1 to 0
         acct.columnconfigure(1, weight=1)
 
         self.account_id_var = tk.StringVar(value="–")
@@ -92,32 +71,28 @@ class SettingsPage(ttk.Frame):
 
         # --- Actions & Status ---
         actions = ttk.Frame(self)
-        actions.grid(row=2, column=0, sticky="ew", pady=(10,0))
-        ttk.Button(actions, text="Save Settings", command=self.save_settings).pack(side="left", padx=5)
+        actions.grid(row=1, column=0, sticky="ew", pady=(10,0)) # Changed row from 2 to 1
+        # Removed "Save Settings" button as settings are primarily config file / env var based for OpenAPI
         ttk.Button(actions, text="Connect", command=self.attempt_connection).pack(side="left", padx=5)
 
         self.status = ttk.Label(self, text="Disconnected", anchor="center")
-        self.status.grid(row=3, column=0, sticky="ew", pady=(5,0))
+        self.status.grid(row=2, column=0, sticky="ew", pady=(5,0)) # Changed row from 3 to 2
 
     def save_settings(self):
-        s = self.controller.settings
-        s.fix_host = self.host_var.get()
-        s.fix_port = self.port_var.get()
-        s.fix_sender_comp_id = self.sender_var.get()
-        s.fix_target_comp_id = self.target_var.get()
-        s.fix_password = self.password_var.get()
+        # This method is now largely obsolete as OpenAPI settings are loaded from config/env
+        # and there are no specific FIX settings to save from this UI page.
+        # We could potentially save the `default_ctid_trader_account_id` if it's fetched and confirmed,
+        # but the current flow loads it from config.json.
+        # For now, we can make this a no-op or remove it if no settings are managed here.
+        pass
 
     def attempt_connection(self):
-        self.save_settings()
+        # self.save_settings() # No longer needed as FIX settings are removed
         t = self.controller.trader
 
-        # Re-init FIX params on the Trader
+        # Ensure trader uses the latest settings (though they are loaded at init)
+        # No specific FIX params to re-init on the Trader for OpenAPI
         t.settings = self.controller.settings
-        t.fix_host = t.settings.fix_host
-        t.fix_port = t.settings.fix_port
-        t.fix_sender_comp_id = t.settings.fix_sender_comp_id
-        t.fix_target_comp_id = t.settings.fix_target_comp_id
-        t.fix_password = t.settings.fix_password
 
         if t.connect():
             self.status.config(text="Connecting...", foreground="orange")
@@ -133,23 +108,26 @@ class SettingsPage(ttk.Frame):
         connected, msg = t.get_connection_status()
         if connected:
             # proceed to post-connection
-            self._extracted_from_attempt_connection_14(t)
+            self._on_successful_connection(t) # Renamed
         else:
-            if msg:
+            if msg: # If there's an error message, connection attempt failed
                 messagebox.showerror("Connection Failed", msg)
                 self.status.config(text=f"Failed: {msg}", foreground="red")
-            else:
+            else: # No error message yet, still trying
                 self.after(200, self._check_connection)
 
-    # TODO Rename this here and in `attempt_connection`
-            _, msg = t.get_connection_status()
-            messagebox.showerror("Connection Failed", msg)
-            self.status.config(text=f"Failed: {msg}", foreground="red")
+    # Note: The duplicated block after the TODO was problematic.
+    # The logic should be: if connected, call success. If not connected and msg exists, show error.
+    # If not connected and no msg, keep polling. This is now reflected above.
 
-    # TODO Rename this here and in `attempt_connection`
-    def _extracted_from_attempt_connection_14(self, t):
-        t.start_heartbeat()
+    def _on_successful_connection(self, t): # Renamed from _extracted_from_attempt_connection_14
+        # t.start_heartbeat() # Heartbeat is typically managed by the Trader/API library after connection
         summary = t.get_account_summary()
+        if summary.get("balance") is None: # Check if summary is still 'connecting...'
+            # This can happen if get_account_summary is called before trader details are fully populated
+            self.after(200, lambda: self._on_successful_connection(t)) # Retry shortly
+            return
+
         self.account_id_var.set(summary.get("account_id", "–"))
         self.balance_var.set(f"{summary['balance']:.2f}")
         self.equity_var.set(f"{summary['equity']:.2f}")
@@ -163,6 +141,14 @@ class SettingsPage(ttk.Frame):
             f"Margin: {summary['margin']:.2f}"
         )
         self.status.config(text="Connected ✅", foreground="green")
+
+        # Update TradingPage with account info
+        trading_page = self.controller.pages[TradingPage]
+        trading_page.update_account_info(
+            account_id=summary.get("account_id", "–"),
+            balance=summary.get("balance"),
+            equity=summary.get("equity")
+        )
         self.controller.show_page(TradingPage)
 
 
@@ -181,65 +167,88 @@ class TradingPage(ttk.Frame):
         self.is_scalping = False
         self.scalping_thread = None
 
+        # Account Info StringVars
+        self.account_id_var_tp = tk.StringVar(value="–")
+        self.balance_var_tp = tk.StringVar(value="–")
+        self.equity_var_tp = tk.StringVar(value="–")
+
         # configure grid
-        for r in range(11):
+        # Adjusted row count for new account info section
+        for r in range(12): # Increased range for new row
             self.rowconfigure(r, weight=0)
-        self.rowconfigure(11, weight=1)
+        self.rowconfigure(12, weight=1) # Adjusted log row index
         self.columnconfigure(1, weight=1)
+
 
         # ← Settings button
         ttk.Button(self, text="← Settings", command=lambda: controller.show_page(SettingsPage)).grid(
-            row=0, column=0, pady=(0,10), sticky="w"
+            row=0, column=0, columnspan=2, pady=(0,10), sticky="w" # columnspan to align with other full-width elements
         )
 
+        # Account Info Display
+        acc_info_frame = ttk.Labelframe(self, text="Account Information", padding=5)
+        acc_info_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0,10))
+        acc_info_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(acc_info_frame, text="Account ID:").grid(row=0, column=0, sticky="w", padx=(0,5))
+        ttk.Label(acc_info_frame, textvariable=self.account_id_var_tp).grid(row=0, column=1, sticky="w")
+
+        ttk.Label(acc_info_frame, text="Balance:").grid(row=1, column=0, sticky="w", padx=(0,5))
+        ttk.Label(acc_info_frame, textvariable=self.balance_var_tp).grid(row=1, column=1, sticky="w")
+
+        ttk.Label(acc_info_frame, text="Equity:").grid(row=2, column=0, sticky="w", padx=(0,5))
+        ttk.Label(acc_info_frame, textvariable=self.equity_var_tp).grid(row=2, column=1, sticky="w")
+
+
         # Symbol dropdown
-        ttk.Label(self, text="Symbol:").grid(row=1, column=0, sticky="w", padx=(0,5))
+        # Row indices are +1 from original due to Account Info section added at row=1
+        ttk.Label(self, text="Symbol:").grid(row=2, column=0, sticky="w", padx=(0,5))
         self.symbol_var = tk.StringVar(value=self.COMMON_PAIRS[0])
         cb_symbol = ttk.Combobox(self, textvariable=self.symbol_var,
                                  values=self.COMMON_PAIRS, state="readonly")
-        cb_symbol.grid(row=1, column=1, sticky="ew")
+        cb_symbol.grid(row=2, column=1, sticky="ew") # Corrected from row=1
         cb_symbol.bind("<<ComboboxSelected>>", lambda e: self.refresh_price())
 
         # Price display + refresh
-        ttk.Label(self, text="Price:").grid(row=2, column=0, sticky="w", padx=(0,5))
+        ttk.Label(self, text="Price:").grid(row=3, column=0, sticky="w", padx=(0,5)) # Was row=2
         self.price_var = tk.StringVar(value="–")
         pf = ttk.Frame(self)
-        pf.grid(row=2, column=1, sticky="ew")
+        pf.grid(row=3, column=1, sticky="ew") # Was row=2
         ttk.Label(pf, textvariable=self.price_var,
                   font=("TkDefaultFont", 12, "bold")).pack(side="left")
         ttk.Button(pf, text="↻", width=2, command=self.refresh_price).pack(side="right")
 
         # Profit target
-        ttk.Label(self, text="Profit Target (pips):").grid(row=3, column=0, sticky="w", padx=(0,5))
+        ttk.Label(self, text="Profit Target (pips):").grid(row=4, column=0, sticky="w", padx=(0,5)) # Was row=3
         self.tp_var = tk.DoubleVar(value=10.0)
-        ttk.Entry(self, textvariable=self.tp_var).grid(row=3, column=1, sticky="ew")
+        ttk.Entry(self, textvariable=self.tp_var).grid(row=4, column=1, sticky="ew") # Was row=3
 
         # Order size
-        ttk.Label(self, text="Order Size (lots):").grid(row=4, column=0, sticky="w", padx=(0,5))
+        ttk.Label(self, text="Order Size (lots):").grid(row=5, column=0, sticky="w", padx=(0,5)) # Was row=4
         self.size_var = tk.DoubleVar(value=1.0)
-        ttk.Entry(self, textvariable=self.size_var).grid(row=4, column=1, sticky="ew")
+        ttk.Entry(self, textvariable=self.size_var).grid(row=5, column=1, sticky="ew") # Was row=4
 
         # Stop-loss
-        ttk.Label(self, text="Stop Loss (pips):").grid(row=5, column=0, sticky="w", padx=(0,5))
+        ttk.Label(self, text="Stop Loss (pips):").grid(row=6, column=0, sticky="w", padx=(0,5)) # Was row=5
         self.sl_var = tk.DoubleVar(value=5.0)
-        ttk.Entry(self, textvariable=self.sl_var).grid(row=5, column=1, sticky="ew")
+        ttk.Entry(self, textvariable=self.sl_var).grid(row=6, column=1, sticky="ew") # Was row=5
 
         # Strategy selector
-        ttk.Label(self, text="Strategy:").grid(row=6, column=0, sticky="w", padx=(0,5))
+        ttk.Label(self, text="Strategy:").grid(row=7, column=0, sticky="w", padx=(0,5)) # Was row=6
         self.strategy_var = tk.StringVar(value="Safe")
         strategy_names = ["Safe", "Moderate", "Aggressive", "Momentum", "Mean Reversion"]
         cb_strat = ttk.Combobox(self, textvariable=self.strategy_var, values=strategy_names, state="readonly")
-        cb_strat.grid(row=6, column=1, sticky="ew")
+        cb_strat.grid(row=7, column=1, sticky="ew") # Was row=6
 
         # Start/Stop Scalping buttons
         self.start_button = ttk.Button(self, text="Begin Scalping", command=self.start_scalping)
-        self.start_button.grid(row=7, column=0, columnspan=2, pady=(10,0))
+        self.start_button.grid(row=8, column=0, columnspan=2, pady=(10,0)) # Was row=7
         self.stop_button  = ttk.Button(self, text="Stop Scalping", command=self.stop_scalping, state="disabled")
-        self.stop_button.grid(row=8, column=0, columnspan=2, pady=(5,0))
+        self.stop_button.grid(row=9, column=0, columnspan=2, pady=(5,0)) # Was row=8
 
         # Session Stats frame
         stats = ttk.Labelframe(self, text="Session Stats", padding=10)
-        stats.grid(row=9, column=0, columnspan=2, sticky="ew", pady=(10,0))
+        stats.grid(row=10, column=0, columnspan=2, sticky="ew", pady=(10,0)) # Was row=9
         stats.columnconfigure(1, weight=1)
 
         self.pnl_var       = tk.StringVar(value="0.00")
@@ -255,9 +264,9 @@ class TradingPage(ttk.Frame):
 
         # Output log
         self.output = tk.Text(self, height=8, wrap="word", state="disabled")
-        self.output.grid(row=11, column=0, columnspan=2, sticky="nsew", pady=(10,0))
+        self.output.grid(row=12, column=0, columnspan=2, sticky="nsew", pady=(10,0)) # Was row=11
         sb = ttk.Scrollbar(self, command=self.output.yview)
-        sb.grid(row=11, column=2, sticky="ns")
+        sb.grid(row=12, column=2, sticky="ns") # Was row=11
         self.output.config(yscrollcommand=sb.set)
 
         # Internal counters
@@ -266,6 +275,18 @@ class TradingPage(ttk.Frame):
         self.wins         = 0
 
         self.refresh_price()
+
+    def update_account_info(self, account_id: str, balance: float | None, equity: float | None):
+        """Public method to update account info StringVars from outside (e.g., SettingsPage)."""
+        self.account_id_var_tp.set(account_id)
+        if balance is not None:
+            self.balance_var_tp.set(f"{balance:.2f}")
+        else:
+            self.balance_var_tp.set("–")
+        if equity is not None:
+            self.equity_var_tp.set(f"{equity:.2f}")
+        else:
+            self.equity_var_tp.set("–")
 
     def _process_ui_queue(self):
         """Called on the mainloop to drain the UI event queue."""
