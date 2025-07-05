@@ -69,7 +69,8 @@ try:
     from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import (
         ProtoHeartbeatEvent,
         ProtoErrorRes,
-        ProtoMessage
+        ProtoMessage,
+        ProtoOAPayloadType # Moved from OpenApiMessages_pb2
     )
     from ctrader_open_api.messages.OpenApiMessages_pb2 import (
         ProtoOAApplicationAuthReq, ProtoOAApplicationAuthRes,
@@ -82,8 +83,8 @@ try:
         ProtoOAErrorRes,
         # For deserializing specific messages from ProtoMessage wrapper
         ProtoOAGetCtidProfileByTokenRes,
-        ProtoOAGetCtidProfileByTokenReq, # Added for sending
-        ProtoOAPayloadType
+        ProtoOAGetCtidProfileByTokenReq # Added for sending
+        # ProtoOAPayloadType was moved to OpenApiCommonMessages_pb2
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import ProtoOATrader
     USE_OPENAPI_LIB = True
