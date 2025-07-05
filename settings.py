@@ -19,8 +19,8 @@ class OpenAPISettings:
     default_ctid_trader_account_id: Optional[int] = None # Store as int if it's numeric
 
     # OAuth2 specific URLs
-    spotware_auth_url: str = "https://id.ctrader.com/my/settings/openapi/grantingaccess/" # Updated URL
-    spotware_token_url: str = "https://connect.spotware.com/oauth/v2/token" # Assuming token URL remains standard
+    spotware_auth_url: str = "https://connect.spotware.com/oauth/v2/auth" # Standard URL
+    spotware_token_url: str = "https://connect.spotware.com/oauth/v2/token" # Standard URL
     redirect_uri: str = "http://localhost:5000/callback" # As specified
 
 
@@ -68,7 +68,7 @@ class Settings:
             client_secret=client_secret,
             host_type=openapi_cfg.get("host_type", "demo").lower(), # Ensure lowercase "demo" or "live"
             default_ctid_trader_account_id=openapi_cfg.get("default_ctid_trader_account_id"),
-            spotware_auth_url=openapi_cfg.get("spotware_auth_url", "https://id.ctrader.com/my/settings/openapi/grantingaccess/"), # Updated default
+            spotware_auth_url=openapi_cfg.get("spotware_auth_url", "https://connect.spotware.com/oauth/v2/auth"), # Standard default
             spotware_token_url=openapi_cfg.get("spotware_token_url", "https://connect.spotware.com/oauth/v2/token"),
             redirect_uri=openapi_cfg.get("redirect_uri", "http://localhost:5000/callback") # Should generally not be overridden from config
         )

@@ -4,7 +4,7 @@
         "client_secret": "5nT43rQRm9IbUv1ELUbymjyTxbfIcsGECULNysuHrrJWji2zvz",
         "host_type": "demo",
         "default_ctid_trader_account_id": 6077021,
-        "spotware_auth_url": "https://id.ctrader.com/my/settings/openapi/grantingaccess/",
+        "spotware_auth_url": "https://connect.spotware.com/oauth/v2/auth",
         "spotware_token_url": "https://connect.spotware.com/oauth/v2/token",
         "redirect_uri": "http://localhost:5000/callback"
     },
