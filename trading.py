@@ -449,7 +449,7 @@ class Trader:
         client_id = self.settings.openapi.client_id
         redirect_uri = self.settings.openapi.redirect_uri
         # Define scopes - this might need adjustment based on Spotware's requirements
-        scopes = "trading accounts" # Common scopes, adjust as needed
+        scopes = "accounts" # Changed from "trading accounts" to just "accounts" based on OpenApiPy example hint
 
         # Construct the authorization URL using the new Spotware URL
         # Construct the authorization URL using the standard Spotware OAuth endpoint.
