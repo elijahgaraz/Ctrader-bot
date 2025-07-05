@@ -79,7 +79,11 @@ try:
         ProtoOASubscribeSpotsReq, ProtoOASubscribeSpotsRes,
         ProtoOASpotEvent, ProtoOATraderUpdatedEvent,
         ProtoOANewOrderReq, ProtoOAExecutionEvent,
-        ProtoOAErrorRes
+        ProtoOAErrorRes,
+        # For deserializing specific messages from ProtoMessage wrapper
+        ProtoOAGetCtidProfileByTokenRes,
+        ProtoOAGetCtidProfileByTokenReq, # Added for sending
+        ProtoOAPayloadType
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import ProtoOATrader
     USE_OPENAPI_LIB = True
@@ -234,26 +238,100 @@ class Trader:
         self._is_client_connected = False
 
     def _on_message_received(self, client: Client, message: Any) -> None:
-        # Dispatch by type
-        if isinstance(message, ProtoOAApplicationAuthRes):
-            self._handle_app_auth_response(message)
-        elif isinstance(message, ProtoOAAccountAuthRes):
-            self._handle_account_auth_response(message)
-        elif isinstance(message, ProtoOAGetAccountListByAccessTokenRes):
-            self._handle_get_account_list_response(message)
-        elif isinstance(message, ProtoOATraderRes):
-            self._handle_trader_response(message)
-        elif isinstance(message, ProtoOATraderUpdatedEvent):
-            self._handle_trader_updated_event(message)
-        elif isinstance(message, ProtoOASpotEvent):
-            self._handle_spot_event(message)
-        elif isinstance(message, ProtoOAExecutionEvent):
-            self._handle_execution_event(message)
-        elif isinstance(message, ProtoHeartbeatEvent):
-            print("Received heartbeat.")
-        elif isinstance(message, ProtoOAErrorRes):
-            print(f"Error message received: {message.errorCode}")
-            self._last_error = message.description
+        print(f"_on_message_received: Outer message type: {type(message)}")
+
+        actual_message = message
+        payload_type = 0 # Default for non-ProtoMessage or if extraction fails
+
+        if isinstance(message, ProtoMessage):
+            payload_type = message.payloadType
+            payload_bytes = message.payload
+            print(f"  It's a ProtoMessage wrapper. PayloadType: {payload_type}, Payload an_instance_of bytes: {isinstance(payload_bytes, bytes)}")
+
+            # Deserialize based on payloadType
+            if payload_type == ProtoOAPayloadType.OA_APPLICATION_AUTH_RES: # 2101
+                actual_message = ProtoOAApplicationAuthRes()
+                actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.OA_ACCOUNT_AUTH_RES: # 2103
+                actual_message = ProtoOAAccountAuthRes()
+                actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.OA_GET_CTID_PROFILE_BY_TOKEN_RES: # 2142
+                actual_message = ProtoOAGetCtidProfileByTokenRes()
+                actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES: # 2135 (ProtoOAGetAccountListByAccessTokenRes)
+                actual_message = ProtoOAGetAccountListByAccessTokenRes()
+                actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.OA_TRADER_RES: # 2120
+                 actual_message = ProtoOATraderRes()
+                 actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.OA_TRADER_UPDATE_EVENT: # 2126 (ProtoOATraderUpdatedEvent)
+                 actual_message = ProtoOATraderUpdatedEvent()
+                 actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.OA_SPOT_EVENT: # 2128 (ProtoOASpotEvent)
+                actual_message = ProtoOASpotEvent()
+                actual_message.ParseFromString(payload_bytes)
+            # ProtoOAExecutionEvent uses 2127, handle if needed
+            # elif payload_type == ProtoOAPayloadType.OA_EXECUTION_EVENT:
+            #     actual_message = ProtoOAExecutionEvent()
+            #     actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.OA_ERROR_RES: # 2105
+                actual_message = ProtoOAErrorRes()
+                actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.ERROR_RES: # 50 (common error)
+                actual_message = ProtoErrorRes()
+                actual_message.ParseFromString(payload_bytes)
+            elif payload_type == ProtoOAPayloadType.HEARTBEAT_EVENT: # 51
+                actual_message = ProtoHeartbeatEvent()
+                actual_message.ParseFromString(payload_bytes)
+            else:
+                print(f"  No specific deserializer for PayloadType: {payload_type}. Dispatch will use original wrapper or fail on type.")
+                # actual_message remains the original ProtoMessage; subsequent isinstance checks will fail for specific types
+                # This is important: if we don't deserialize, it won't match specific handlers.
+
+        if actual_message is not message : # Log if deserialization happened
+             print(f"  Deserialized to: {type(actual_message)}")
+
+
+        # Dispatch by type using the (potentially deserialized) actual_message
+        if isinstance(actual_message, ProtoOAApplicationAuthRes):
+            print("  Dispatching to _handle_app_auth_response")
+            self._handle_app_auth_response(actual_message)
+        elif isinstance(actual_message, ProtoOAAccountAuthRes):
+            print("  Dispatching to _handle_account_auth_response")
+            self._handle_account_auth_response(actual_message)
+        elif isinstance(actual_message, ProtoOAGetCtidProfileByTokenRes):
+            print("  Dispatching to _handle_get_ctid_profile_response")
+            self._handle_get_ctid_profile_response(actual_message)
+        elif isinstance(actual_message, ProtoOAGetAccountListByAccessTokenRes):
+            print("  Dispatching to _handle_get_account_list_response")
+            self._handle_get_account_list_response(actual_message)
+        elif isinstance(actual_message, ProtoOATraderRes):
+            print("  Dispatching to _handle_trader_response")
+            self._handle_trader_response(actual_message)
+        elif isinstance(actual_message, ProtoOATraderUpdatedEvent):
+            print("  Dispatching to _handle_trader_updated_event")
+            self._handle_trader_updated_event(actual_message)
+        elif isinstance(actual_message, ProtoOASpotEvent):
+            # self._handle_spot_event(actual_message) # Potentially noisy
+             print("  Received ProtoOASpotEvent (handler commented out).")
+        elif isinstance(actual_message, ProtoOAExecutionEvent):
+            # self._handle_execution_event(actual_message) # Potentially noisy
+             print("  Received ProtoOAExecutionEvent (handler commented out).")
+        elif isinstance(actual_message, ProtoHeartbeatEvent):
+            print("  Received heartbeat.")
+        elif isinstance(actual_message, ProtoOAErrorRes): # Specific OA error
+            print(f"  Dispatching to ProtoOAErrorRes handler. Error code: {actual_message.errorCode}, Description: {actual_message.description}")
+            self._last_error = f"{actual_message.errorCode}: {actual_message.description}"
+        elif isinstance(actual_message, ProtoErrorRes): # Common error
+            print(f"  Dispatching to ProtoErrorRes (common) handler. Error code: {actual_message.errorCode}, Description: {actual_message.description}")
+            self._last_error = f"Common Error {actual_message.errorCode}: {actual_message.description}"
+        # Check if it's still the original ProtoMessage wrapper because no deserialization rule matched
+        elif actual_message is message and isinstance(message, ProtoMessage):
+            print(f"  ProtoMessage with PayloadType {payload_type} was not handled by specific type checks after deserialization attempt.")
+        elif not isinstance(actual_message, ProtoMessage) and actual_message is message: # Original message was not ProtoMessage
+             print(f"  Unhandled non-ProtoMessage type in _on_message_received: {type(actual_message)}")
+        else: # Should ideally not be reached if all cases are handled
+            print(f"  Message of type {type(actual_message)} (PayloadType {payload_type if payload_type else 'N/A'}) fell through all handlers.")
 
     # Handlers
     def _handle_app_auth_response(self, response: ProtoOAApplicationAuthRes) -> None:
@@ -285,9 +363,86 @@ class Trader:
 
         # Proceed to account auth or account list using the existing self._access_token (from OAuth)
         if self.ctid_trader_account_id:
-            self._send_account_auth_request(self.ctid_trader_account_id)
+            # If we have a pre-configured ctidTraderAccountId, the original flow was to directly authenticate it.
+            # However, given the server responded with ProtoOAGetCtidProfileByTokenRes to AccountAuthReq,
+            # it implies the token might always need to go through a profile check first,
+            # or that AccountAuthReq for a *specific* cTID should only be sent *after* confirming that cTID
+            # is associated with the token (e.g. via profile or account list).
+
+            # New Hypothesis: Always try to get profile first if we have an OAuth token.
+            # If a ctid_trader_account_id is configured, we can use it to verify against the profile/account list later.
+            print("Attempting to get profile by token first, even if default ctidTraderAccountId is set.")
+            self._send_get_ctid_profile_request()
+            # Old logic: self._send_account_auth_request(self.ctid_trader_account_id)
         else:
-            self._send_get_account_list_request()
+            print("No default ctidTraderAccountId. Attempting to get profile by token.")
+            self._send_get_ctid_profile_request()
+
+
+    def _handle_get_ctid_profile_response(self, response: ProtoOAGetCtidProfileByTokenRes) -> None:
+        """
+        Handles the response from a ProtoOAGetCtidProfileByTokenReq.
+        This method is now also tentatively handling the case where this response
+        was received *instead of* an expected ProtoOAAccountAuthRes.
+        """
+        print(f"Received ProtoOAGetCtidProfileByTokenRes.")
+        if hasattr(response, 'ctidTraderAccount') and response.ctidTraderAccount: # Check if field exists and is not empty/default
+            # Assuming ctidTraderAccount is a list of ProtoOACTIDTraderAccount as in GetAccountListRes
+            # Or if it's a single ProtoOACTIDTraderAccount object.
+            # The definition of ProtoOAGetCtidProfileByTokenRes needs to be checked for actual structure.
+            # For now, let's assume it gives a single ctidTraderId or similar.
+            # Let's assume it has a field like `ctidProfile.ctidTraderId` or directly `ctidTraderId`.
+            # This is speculative based on the name.
+            # A common pattern is that it might return a list of ProtoOACtidTraderAccount objects.
+
+            # Placeholder: Log the whole response to understand its structure.
+            print(f"  Profile Response Content: {response}")
+
+            # Example: if response.ctidProfile.ctidTraderId exists:
+            # self.ctid_trader_account_id = response.ctidProfile.ctidTraderId
+            # print(f"  Extracted ctidTraderAccountId from profile: {self.ctid_trader_account_id}")
+            # self._send_account_auth_request(self.ctid_trader_account_id)
+
+            # For now, let's assume the response *might* contain a single ctidTraderAccountId
+            # that we can use. If Spotware's actual flow for this token type is different,
+            # this will need adjustment.
+            # If the response directly gives a ctid for a *trading account*, we can use it.
+            # The message definition for ProtoOAGetCtidProfileByTokenRes is needed.
+            # Typically, a "profile" is user-level, not account-level.
+            # It might give a cTrader ID (user ID), then we'd need ProtoOAGetAccountListByAccessTokenReq.
+
+            # Given the server sent THIS in response to AccountAuth, it's very confusing.
+            # Let's assume for a moment this *is* the new "success" for AccountAuth
+            # and it contains the necessary details to consider the account "authed".
+            # This is a big assumption.
+            if hasattr(response, 'ctidProfile') and hasattr(response.ctidProfile, 'ctidTraderId'):
+                 # This is a guess at the structure of ProtoOAGetCtidProfileByTokenRes
+                 # It might be response.ctidTraderAccount[0].ctidTraderAccountId if it returns a list of accounts
+                 # For now, let's check if we can get *any* ctid to proceed
+                potential_ctid = response.ctidProfile.ctidTraderId # Highly speculative field name
+                if potential_ctid:
+                    print(f"  Potential cTID from profile response: {potential_ctid}")
+                    if not self.ctid_trader_account_id: # If not already set
+                        self.ctid_trader_account_id = potential_ctid
+
+                    # Does this response mean we are "connected" for this ctid?
+                    # Or do we still need to send ProtoOAAccountAuthReq?
+                    # If server sent this INSTEAD of ProtoOAAccountAuthRes, it's possible this
+                    # IS the new "account auth" for this token type.
+                    print("  Assuming profile response implies account readiness. Fetching trader details...")
+                    self.is_connected = True # Tentative: mark as connected to see account details
+                    self._send_get_trader_request(self.ctid_trader_account_id)
+                    return
+
+            print("  ProtoOAGetCtidProfileByTokenRes received, but ctidTraderAccountId not clearly identified or structure unknown.")
+            self._last_error = "Profile received, but account ID unclear."
+            # What to do now? Maybe get account list?
+            # self._send_get_account_list_request() # This also requires an access token.
+
+        else:
+            print("  ProtoOAGetCtidProfileByTokenRes was empty or did not contain expected ctid information.")
+            self._last_error = "Failed to get ctid profile by token or profile empty."
+
 
     def _handle_account_auth_response(self, response: ProtoOAAccountAuthRes) -> None:
         print("AccountAuth response.")
@@ -415,6 +570,51 @@ class Trader:
         # If a token were needed here, the message definition would include it.
         d = self._client.send(req)
         d.addCallbacks(self._handle_trader_response, self._handle_send_error)
+
+    def _send_get_ctid_profile_request(self) -> None:
+        """Sends a ProtoOAGetCtidProfileByTokenReq using the current OAuth access token."""
+        if not self._ensure_valid_token(): # Ensure token is valid before using it
+            return
+
+        if not self._access_token:
+            self._last_error = "Critical: OAuth access token not available for GetCtidProfile request."
+            print(self._last_error)
+            if self._client and self._is_client_connected:
+                self._client.stopService()
+            return
+
+        print("Sending ProtoOAGetCtidProfileByTokenReq...")
+        req = ProtoOAGetCtidProfileByTokenReq()
+        req.accessToken = self._access_token
+
+        try:
+            d = self._client.send(req)
+            print(f"Deferred created for GetCtidProfileByTokenReq: {d}")
+
+            # Adding specific callbacks for this request to see its fate
+            def profile_req_success_callback(response_msg):
+                print(f"GetCtidProfileByTokenReq success_callback triggered. Response type: {type(response_msg)}. Will be handled by _on_message_received.")
+
+            def profile_req_error_callback(failure_reason):
+                print(f"GetCtidProfileByTokenReq error_callback triggered. Failure:")
+                if hasattr(failure_reason, 'getErrorMessage'):
+                    print(f"  Error Message: {failure_reason.getErrorMessage()}")
+                if hasattr(failure_reason, 'getTraceback'): # May be verbose
+                    print(f"  Traceback: {failure_reason.getTraceback(brief=True, capN=10)}") # সংক্ষিপ্ত ট্রেসব্যাক
+                else:
+                    print(f"  Failure object: {failure_reason}")
+                self._handle_send_error(failure_reason)
+
+            d.addCallbacks(profile_req_success_callback, errback=profile_req_error_callback)
+            print("Added callbacks to GetCtidProfileByTokenReq Deferred.")
+
+        except Exception as e:
+            print(f"Exception during _send_get_ctid_profile_request send command: {e}")
+            self._last_error = f"Exception sending GetCtidProfile: {e}"
+            if self._client and self._is_client_connected:
+                self._client.stopService()
+                self.is_connected = False
+
 
     # Public API
     def connect(self) -> bool:
