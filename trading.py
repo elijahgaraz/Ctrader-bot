@@ -68,12 +68,12 @@ try:
     from ctrader_open_api import Client, TcpProtocol, EndPoints
     from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import (
         ProtoHeartbeatEvent,
-        ProtoErrorRes,
-        ProtoMessage
+        ProtoErrorRes,      # Message Class for common error
+        ProtoMessage,
+        # Import specific integer constants for payload types from CommonMessages
+        ERROR_RES,          # Payload type ID for ProtoErrorRes (e.g., 50)
+        HEARTBEAT_EVENT     # Payload type ID for ProtoHeartbeatEvent (e.g., 51)
     )
-    # Try importing ProtoOAPayloadType from OpenApiMessages_pb2
-    from ctrader_open_api.messages.OpenApiMessages_pb2 import ProtoOAPayloadType
-
     from ctrader_open_api.messages.OpenApiMessages_pb2 import (
         ProtoOAApplicationAuthReq, ProtoOAApplicationAuthRes,
         ProtoOAAccountAuthReq, ProtoOAAccountAuthRes,
@@ -82,24 +82,24 @@ try:
         ProtoOASubscribeSpotsReq, ProtoOASubscribeSpotsRes,
         ProtoOASpotEvent, ProtoOATraderUpdatedEvent,
         ProtoOANewOrderReq, ProtoOAExecutionEvent,
-        ProtoOAErrorRes,
+        ProtoOAErrorRes as ProtoOAErrorRes_OA, # Message Class for OA specific error, aliased
         ProtoOAGetCtidProfileByTokenRes,
-        ProtoOAGetCtidProfileByTokenReq
+        ProtoOAGetCtidProfileByTokenReq,
+        # Import specific integer constants for OA payload types
+        PROTO_OA_APPLICATION_AUTH_RES,
+        PROTO_OA_ACCOUNT_AUTH_RES,
+        PROTO_OA_ERROR_RES, # This is the payload type ID for ProtoOAErrorRes_OA
+        PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_RES,
+        PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES,
+        PROTO_OA_TRADER_RES,
+        PROTO_OA_TRADER_UPDATE_EVENT,
+        PROTO_OA_SPOT_EVENT
+        # Add other required REQ/RES/EVENT payload type constants as needed
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import ProtoOATrader
     USE_OPENAPI_LIB = True
-    print("Successfully imported all required cTrader Open API messages and enums.")
-    # ---- DEBUG PRINTS START ----
-    try:
-        print(f"DEBUG: Type of ProtoOAPayloadType is: {type(ProtoOAPayloadType)}")
-        print(f"DEBUG: dir(ProtoOAPayloadType) is: {dir(ProtoOAPayloadType)}")
-        if hasattr(ProtoOAPayloadType, 'OA_APPLICATION_AUTH_RES'):
-            print(f"DEBUG: ProtoOAPayloadType.OA_APPLICATION_AUTH_RES exists. Value: {ProtoOAPayloadType.OA_APPLICATION_AUTH_RES}")
-        else:
-            print("DEBUG: ProtoOAPayloadType.OA_APPLICATION_AUTH_RES does NOT exist.")
-    except NameError:
-        print("DEBUG: ProtoOAPayloadType is not even defined at the point of debug prints (should not happen if import succeeded).")
-    # ---- DEBUG PRINTS END ----
+    print("Successfully imported cTrader Open API messages and payload type constants.")
+
 except ImportError as e:
     print(f"ctrader-open-api import failed ({e}); running in mock mode.")
     USE_OPENAPI_LIB = False
@@ -235,42 +235,38 @@ class Trader:
             payload_bytes = message.payload
             print(f"  It's a ProtoMessage wrapper. PayloadType: {payload_type}, Payload an_instance_of bytes: {isinstance(payload_bytes, bytes)}")
 
-            # Deserialize based on payloadType using ProtoOAPayloadType from OpenApiMessages_pb2
-            if payload_type == ProtoOAPayloadType.OA_APPLICATION_AUTH_RES: # 2101
+            # Deserialize based on payloadType using imported integer constants
+            if payload_type == PROTO_OA_APPLICATION_AUTH_RES: # 2101
                 actual_message = ProtoOAApplicationAuthRes()
                 actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.OA_ACCOUNT_AUTH_RES: # 2103
+            elif payload_type == PROTO_OA_ACCOUNT_AUTH_RES: # 2103
                 actual_message = ProtoOAAccountAuthRes()
                 actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.OA_GET_CTID_PROFILE_BY_TOKEN_RES: # 2142
+            elif payload_type == PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_RES: # 2142
                 actual_message = ProtoOAGetCtidProfileByTokenRes()
                 actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES: # 2135
+            elif payload_type == PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES: # 2135
                 actual_message = ProtoOAGetAccountListByAccessTokenRes()
                 actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.OA_TRADER_RES: # 2120
+            elif payload_type == PROTO_OA_TRADER_RES: # 2120
                  actual_message = ProtoOATraderRes()
                  actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.OA_TRADER_UPDATE_EVENT: # 2126
+            elif payload_type == PROTO_OA_TRADER_UPDATE_EVENT: # 2126
                  actual_message = ProtoOATraderUpdatedEvent()
                  actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.OA_SPOT_EVENT: # 2128
+            elif payload_type == PROTO_OA_SPOT_EVENT: # 2128
                 actual_message = ProtoOASpotEvent()
                 actual_message.ParseFromString(payload_bytes)
-            # elif payload_type == ProtoOAPayloadType.OA_EXECUTION_EVENT: # 2127
+            # elif payload_type == PROTO_OA_EXECUTION_EVENT: # Example: 2127, import if needed
             #     actual_message = ProtoOAExecutionEvent()
             #     actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.OA_ERROR_RES: # 2105
-                actual_message = ProtoOAErrorRes()
+            elif payload_type == PROTO_OA_ERROR_RES: # 2105
+                actual_message = ProtoOAErrorRes_OA() # Using aliased class name
                 actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.ERROR_RES: # 50 (common error from OpenApiCommonMessages_pb2.ProtoPayloadType)
-                                                              # This specific one might need care if ProtoOAPayloadType doesn't include it
-                                                              # However, ERROR_RES (50) and HEARTBEAT_EVENT (51) are typically in a common payload enum.
-                                                              # If ProtoOAPayloadType is specific to OA_ messages, this check might be problematic.
-                                                              # For now, assuming ProtoOAPayloadType includes these common types too, or they won't be hit often here.
+            elif payload_type == ERROR_RES: # 50 (common error from OpenApiCommonMessages_pb2)
                 actual_message = ProtoErrorRes()
                 actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ProtoOAPayloadType.HEARTBEAT_EVENT: # 51
+            elif payload_type == HEARTBEAT_EVENT: # 51 (from OpenApiCommonMessages_pb2)
                 actual_message = ProtoHeartbeatEvent()
                 actual_message.ParseFromString(payload_bytes)
             else:
