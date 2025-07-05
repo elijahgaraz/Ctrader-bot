@@ -66,41 +66,69 @@ import json # For token persistence
 # Imports from ctrader-open-api
 try:
     from ctrader_open_api import Client, TcpProtocol, EndPoints
-    from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import (
-        ProtoHeartbeatEvent,
-        ProtoErrorRes,      # Message Class for common error
-        ProtoMessage,
-        # Import specific integer constants for payload types from CommonMessages
-        ERROR_RES,          # Payload type ID for ProtoErrorRes (e.g., 50)
-        HEARTBEAT_EVENT     # Payload type ID for ProtoHeartbeatEvent (e.g., 51)
-    )
+    from ctrader_open_api.messages import OpenApiCommonMessages_pb2
+    from ctrader_open_api.messages import OpenApiMessages_pb2
+    from ctrader_open_api.messages import OpenApiModelMessages_pb2
+
+    print("--- DEBUG: Attributes of OpenApiCommonMessages_pb2 ---")
+    COMMON_PAYLOAD_ENUM_CANDIDATE = None
+    # Attempt to find an enum that might contain ERROR_RES, HEARTBEAT_EVENT
+    for attr_name_common in dir(OpenApiCommonMessages_pb2):
+        if not attr_name_common.startswith('_') and 'PayloadType' in attr_name_common:
+            print(f"  Found potential common payload type enum in CommonMessages: {attr_name_common}")
+            COMMON_PAYLOAD_ENUM_CANDIDATE = getattr(OpenApiCommonMessages_pb2, attr_name_common)
+            break
+        elif attr_name_common == 'ERROR_RES' or attr_name_common == 'HEARTBEAT_EVENT':
+             print(f"  Found top-level common constant in CommonMessages: {attr_name_common} = {getattr(OpenApiCommonMessages_pb2, attr_name_common)}")
+
+    if COMMON_PAYLOAD_ENUM_CANDIDATE:
+        print(f"DEBUG: Type of COMMON_PAYLOAD_ENUM_CANDIDATE ({attr_name_common}) is: {type(COMMON_PAYLOAD_ENUM_CANDIDATE)}")
+        if hasattr(COMMON_PAYLOAD_ENUM_CANDIDATE, 'ERROR_RES'):
+            print(f"DEBUG: {attr_name_common}.ERROR_RES exists. Value: {COMMON_PAYLOAD_ENUM_CANDIDATE.ERROR_RES}")
+        else:
+            print(f"DEBUG: {attr_name_common}.ERROR_RES does NOT exist.")
+    else:
+        print("DEBUG: Could not find a likely common payload type enum in OpenApiCommonMessages_pb2 by name containing 'PayloadType'.")
+    print("--- END DEBUG CommonMessages ---")
+
+    print("\n--- DEBUG: Attributes of OpenApiMessages_pb2 ---")
+    OA_PAYLOAD_ENUM_CANDIDATE = None
+    # Attempt to find an enum that might contain PROTO_OA_APPLICATION_AUTH_RES
+    for attr_name_oa in dir(OpenApiMessages_pb2):
+        if not attr_name_oa.startswith('_') and 'PayloadType' in attr_name_oa: # Look for an Enum object
+            print(f"  Found potential OA payload type enum in OpenApiMessages: {attr_name_oa}")
+            OA_PAYLOAD_ENUM_CANDIDATE = getattr(OpenApiMessages_pb2, attr_name_oa)
+            break
+        elif attr_name_oa.startswith('PROTO_OA_'): # Check if constants are directly available
+             print(f"  Found top-level OA constant in OpenApiMessages: {attr_name_oa} = {getattr(OpenApiMessages_pb2, attr_name_oa)}")
+
+    if OA_PAYLOAD_ENUM_CANDIDATE:
+        print(f"DEBUG: Type of OA_PAYLOAD_ENUM_CANDIDATE ({attr_name_oa}) is: {type(OA_PAYLOAD_ENUM_CANDIDATE)}")
+        # Check for a specific known member to see if it's enum-like
+        if hasattr(OA_PAYLOAD_ENUM_CANDIDATE, 'PROTO_OA_APPLICATION_AUTH_RES'):
+            print(f"DEBUG: {attr_name_oa}.PROTO_OA_APPLICATION_AUTH_RES exists. Value: {OA_PAYLOAD_ENUM_CANDIDATE.PROTO_OA_APPLICATION_AUTH_RES}")
+        elif hasattr(OA_PAYLOAD_ENUM_CANDIDATE, 'OA_APPLICATION_AUTH_RES'): # Some libraries drop the PROTO_ prefix for members
+             print(f"DEBUG: {attr_name_oa}.OA_APPLICATION_AUTH_RES exists. Value: {OA_PAYLOAD_ENUM_CANDIDATE.OA_APPLICATION_AUTH_RES}")
+        else:
+            print(f"DEBUG: Neither PROTO_OA_APPLICATION_AUTH_RES nor OA_APPLICATION_AUTH_RES exists on {attr_name_oa}.")
+    else:
+        print("DEBUG: Could not find a likely OA payload type enum in OpenApiMessages_pb2 by name containing 'PayloadType'.")
+    print("--- END DEBUG OpenApiMessages ---")
+
+    # Import message classes needed for deserialization and requests
+    from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import ProtoHeartbeatEvent, ProtoErrorRes, ProtoMessage
     from ctrader_open_api.messages.OpenApiMessages_pb2 import (
-        ProtoOAApplicationAuthReq, ProtoOAApplicationAuthRes,
-        ProtoOAAccountAuthReq, ProtoOAAccountAuthRes,
-        ProtoOAGetAccountListByAccessTokenReq, ProtoOAGetAccountListByAccessTokenRes,
-        ProtoOATraderReq, ProtoOATraderRes,
-        ProtoOASubscribeSpotsReq, ProtoOASubscribeSpotsRes,
-        ProtoOASpotEvent, ProtoOATraderUpdatedEvent,
-        ProtoOANewOrderReq, ProtoOAExecutionEvent,
-        ProtoOAErrorRes as ProtoOAErrorRes_OA, # Message Class for OA specific error, aliased
-        ProtoOAGetCtidProfileByTokenRes,
-        ProtoOAGetCtidProfileByTokenReq,
-        # Import specific integer constants for OA payload types
-        PROTO_OA_APPLICATION_AUTH_RES,
-        PROTO_OA_ACCOUNT_AUTH_RES,
-        PROTO_OA_ERROR_RES, # This is the payload type ID for ProtoOAErrorRes_OA
-        PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_RES,
-        PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES,
-        PROTO_OA_TRADER_RES,
-        PROTO_OA_TRADER_UPDATE_EVENT,
-        PROTO_OA_SPOT_EVENT
-        # Add other required REQ/RES/EVENT payload type constants as needed
+        ProtoOAApplicationAuthRes, ProtoOAAccountAuthRes, ProtoOAGetCtidProfileByTokenRes,
+        ProtoOAGetAccountListByAccessTokenRes, ProtoOATraderRes, ProtoOATraderUpdatedEvent,
+        ProtoOASpotEvent, ProtoOAErrorRes as ProtoOAErrorRes_OA,
+        ProtoOAApplicationAuthReq, ProtoOAAccountAuthReq, ProtoOAGetCtidProfileByTokenReq
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import ProtoOATrader
-    USE_OPENAPI_LIB = True
-    print("Successfully imported cTrader Open API messages and payload type constants.")
 
-except ImportError as e:
+    USE_OPENAPI_LIB = True
+    print("Successfully imported cTrader Open API message classes (actual types may still need verification).")
+
+except Exception as e:
     print(f"ctrader-open-api import failed ({e}); running in mock mode.")
     USE_OPENAPI_LIB = False
 
@@ -232,53 +260,19 @@ class Trader:
 
         if isinstance(message, ProtoMessage):
             payload_type = message.payloadType
+            payload_type = message.payloadType
             payload_bytes = message.payload
             print(f"  It's a ProtoMessage wrapper. PayloadType: {payload_type}, Payload an_instance_of bytes: {isinstance(payload_bytes, bytes)}")
 
-            # Deserialize based on payloadType using imported integer constants
-            if payload_type == PROTO_OA_APPLICATION_AUTH_RES: # 2101
-                actual_message = ProtoOAApplicationAuthRes()
-                actual_message.ParseFromString(payload_bytes)
-            elif payload_type == PROTO_OA_ACCOUNT_AUTH_RES: # 2103
-                actual_message = ProtoOAAccountAuthRes()
-                actual_message.ParseFromString(payload_bytes)
-            elif payload_type == PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_RES: # 2142
-                actual_message = ProtoOAGetCtidProfileByTokenRes()
-                actual_message.ParseFromString(payload_bytes)
-            elif payload_type == PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES: # 2135
-                actual_message = ProtoOAGetAccountListByAccessTokenRes()
-                actual_message.ParseFromString(payload_bytes)
-            elif payload_type == PROTO_OA_TRADER_RES: # 2120
-                 actual_message = ProtoOATraderRes()
-                 actual_message.ParseFromString(payload_bytes)
-            elif payload_type == PROTO_OA_TRADER_UPDATE_EVENT: # 2126
-                 actual_message = ProtoOATraderUpdatedEvent()
-                 actual_message.ParseFromString(payload_bytes)
-            elif payload_type == PROTO_OA_SPOT_EVENT: # 2128
-                actual_message = ProtoOASpotEvent()
-                actual_message.ParseFromString(payload_bytes)
-            # elif payload_type == PROTO_OA_EXECUTION_EVENT: # Example: 2127, import if needed
-            #     actual_message = ProtoOAExecutionEvent()
-            #     actual_message.ParseFromString(payload_bytes)
-            elif payload_type == PROTO_OA_ERROR_RES: # 2105
-                actual_message = ProtoOAErrorRes_OA() # Using aliased class name
-                actual_message.ParseFromString(payload_bytes)
-            elif payload_type == ERROR_RES: # 50 (common error from OpenApiCommonMessages_pb2)
-                actual_message = ProtoErrorRes()
-                actual_message.ParseFromString(payload_bytes)
-            elif payload_type == HEARTBEAT_EVENT: # 51 (from OpenApiCommonMessages_pb2)
-                actual_message = ProtoHeartbeatEvent()
-                actual_message.ParseFromString(payload_bytes)
-            else:
-                print(f"  No specific deserializer for PayloadType: {payload_type}. Dispatch will use original wrapper or fail on type.")
-                # actual_message remains the original ProtoMessage; subsequent isinstance checks will fail for specific types
-                # This is important: if we don't deserialize, it won't match specific handlers.
+            # Temporarily comment out deserialization to avoid NameError until enum names are known from debug prints
+            print("DEBUG: Deserialization logic temporarily bypassed in _on_message_received to find enum names.")
+            actual_message = message # Process the wrapper directly for now or handle based on raw payload_type integer
 
-        if actual_message is not message : # Log if deserialization happened
-             print(f"  Deserialized to: {type(actual_message)}")
-
+        # Fallback to original message if not a ProtoMessage wrapper or if deserialization is skipped
+        # The isinstance checks below will operate on 'actual_message'
 
         # Dispatch by type using the (potentially deserialized) actual_message
+        # This block will likely not hit specific handlers correctly until deserialization is restored
         if isinstance(actual_message, ProtoOAApplicationAuthRes):
             print("  Dispatching to _handle_app_auth_response")
             self._handle_app_auth_response(actual_message)
@@ -288,35 +282,21 @@ class Trader:
         elif isinstance(actual_message, ProtoOAGetCtidProfileByTokenRes):
             print("  Dispatching to _handle_get_ctid_profile_response")
             self._handle_get_ctid_profile_response(actual_message)
-        elif isinstance(actual_message, ProtoOAGetAccountListByAccessTokenRes):
-            print("  Dispatching to _handle_get_account_list_response")
-            self._handle_get_account_list_response(actual_message)
-        elif isinstance(actual_message, ProtoOATraderRes):
-            print("  Dispatching to _handle_trader_response")
-            self._handle_trader_response(actual_message)
-        elif isinstance(actual_message, ProtoOATraderUpdatedEvent):
-            print("  Dispatching to _handle_trader_updated_event")
-            self._handle_trader_updated_event(actual_message)
-        elif isinstance(actual_message, ProtoOASpotEvent):
-            # self._handle_spot_event(actual_message) # Potentially noisy
-             print("  Received ProtoOASpotEvent (handler commented out).")
-        elif isinstance(actual_message, ProtoOAExecutionEvent):
-            # self._handle_execution_event(actual_message) # Potentially noisy
-             print("  Received ProtoOAExecutionEvent (handler commented out).")
+        # ... (other isinstance checks for specific messages) ...
+        # It's okay if these don't hit for now, the goal is to get the debug prints from the import block
         elif isinstance(actual_message, ProtoHeartbeatEvent):
             print("  Received heartbeat.")
-        elif isinstance(actual_message, ProtoOAErrorRes): # Specific OA error
+        elif isinstance(actual_message, ProtoOAErrorRes_OA):
             print(f"  Dispatching to ProtoOAErrorRes handler. Error code: {actual_message.errorCode}, Description: {actual_message.description}")
             self._last_error = f"{actual_message.errorCode}: {actual_message.description}"
-        elif isinstance(actual_message, ProtoErrorRes): # Common error
+        elif isinstance(actual_message, ProtoErrorRes):
             print(f"  Dispatching to ProtoErrorRes (common) handler. Error code: {actual_message.errorCode}, Description: {actual_message.description}")
             self._last_error = f"Common Error {actual_message.errorCode}: {actual_message.description}"
-        # Check if it's still the original ProtoMessage wrapper because no deserialization rule matched
-        elif actual_message is message and isinstance(message, ProtoMessage):
-            print(f"  ProtoMessage with PayloadType {payload_type} was not handled by specific type checks after deserialization attempt.")
-        elif not isinstance(actual_message, ProtoMessage) and actual_message is message: # Original message was not ProtoMessage
+        elif actual_message is message and isinstance(message, ProtoMessage): # Still a wrapper
+            print(f"  ProtoMessage with PayloadType {payload_type} was not specifically deserialized or handled.")
+        elif not isinstance(actual_message, ProtoMessage) and actual_message is message:
              print(f"  Unhandled non-ProtoMessage type in _on_message_received: {type(actual_message)}")
-        else: # Should ideally not be reached if all cases are handled
+        else:
             print(f"  Message of type {type(actual_message)} (PayloadType {payload_type if payload_type else 'N/A'}) fell through all handlers.")
 
     # Handlers
