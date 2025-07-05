@@ -148,23 +148,29 @@ class Trader:
         self._send_account_auth_request(self.ctid_trader_account_id)
 
     def _handle_trader_response(self, response: ProtoOATraderRes) -> None:
-        trader = self._extracted_from__handle_trader_updated_event_2(
-            "Trader details response.", response
+        trader_details = self._update_trader_details(
+            "Trader details response.", response.trader
         )
-        self.account_id = str(trader.ctidTraderAccountId)
+        if trader_details:
+            self.account_id = str(trader_details.ctidTraderAccountId)
+            # Potentially other fields from trader_details could be assigned here if needed
 
     def _handle_trader_updated_event(self, event: ProtoOATraderUpdatedEvent) -> None:
-        trader = self._extracted_from__handle_trader_updated_event_2(
-            "Trader updated event.", event
+        self._update_trader_details(
+            "Trader updated event.", event.trader
         )
 
-    # TODO Rename this here and in `_handle_trader_response` and `_handle_trader_updated_event`
-    def _extracted_from__handle_trader_updated_event_2(self, arg0, arg1):
-        print(arg0)
-        result = arg1.trader
-        self.balance = result.balance / 100.0
-        self.equity = result.equity / 100.0
-        return result
+    def _update_trader_details(self, log_message: str, trader_proto: ProtoOATrader):
+        """Helper to update trader balance and equity from a ProtoOATrader object."""
+        print(log_message)
+        if trader_proto:
+            self.balance = trader_proto.balance / 100.0  # Assuming balance is in cents
+            self.equity = trader_proto.equity / 100.0    # Assuming equity is in cents
+            # self.currency = trader_proto.currency # If currency is available and needed
+            # self.ctid_trader_account_id = trader_proto.ctidTraderAccountId # Already known, but can confirm
+            print(f"Updated account {trader_proto.ctidTraderAccountId}: Balance: {self.balance}, Equity: {self.equity}")
+            return trader_proto
+        return None
 
     def _handle_spot_event(self, event: ProtoOASpotEvent) -> None:
         # TODO: update self.price_history
