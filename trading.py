@@ -452,22 +452,15 @@ class Trader:
         scopes = "trading accounts" # Common scopes, adjust as needed
 
         # Construct the authorization URL using the new Spotware URL
-        # and add product=web parameter.
+        # Construct the authorization URL using the standard Spotware OAuth endpoint.
         params = {
+            "response_type": "code", # Required for Authorization Code flow
             "client_id": client_id,
             "redirect_uri": redirect_uri,
-            "scope": scopes,
-            "product": "web"
+            "scope": scopes
+            # product="web" is removed as it's not part of standard OAuth params here
+            # "state": "YOUR_UNIQUE_STATE_HERE" # Optional: for CSRF protection
         }
-        # For the "grantingaccess" URL, response_type=code might not be needed as a query parameter,
-        # as the URL's purpose itself is to grant access and then redirect with a code.
-        # However, if the standard token endpoint is used later, it expects a code from such a flow.
-        # If issues persist, we might test removing response_type=code for this specific auth_url.
-        # For now, let's assume it might still be implicitly part of the flow or handled by Spotware.
-        # If their example URL doesn't show response_type, we might remove it.
-        # The provided example "https://id.ctrader.com/my/settings/openapi/grantingaccess/?client_id={clientId}&redirect_uri={your_redirectURI}&scope={scope}&product=web"
-        # does not explicitly show response_type=code. Let's match that.
-
         auth_url_with_params = f"{auth_url}?{urllib.parse.urlencode(params)}"
 
         # At this point, the application will wait. The user needs to authenticate
