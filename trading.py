@@ -462,8 +462,7 @@ class Trader:
         # import urllib.parse # Already imported at top level
         auth_url_with_params = f"{auth_url}?{urllib.parse.urlencode(params)}"
 
-        print(f"Redirecting to browser for authentication: {auth_url_with_params}")
-        webbrowser.open(auth_url_with_params)
+        # webbrowser.open(auth_url_with_params) # Removed duplicate call - should open AFTER server starts
 
         # At this point, the application will wait. The user needs to authenticate
         # in the browser, and then manually provide the authorization code.
