@@ -70,8 +70,10 @@ try:
         ProtoHeartbeatEvent,
         ProtoErrorRes,
         ProtoMessage
-        # ProtoPayloadType / ProtoOAPayloadType not here
     )
+    # Try importing ProtoOAPayloadType from OpenApiMessages_pb2
+    from ctrader_open_api.messages.OpenApiMessages_pb2 import ProtoOAPayloadType
+
     from ctrader_open_api.messages.OpenApiMessages_pb2 import (
         ProtoOAApplicationAuthReq, ProtoOAApplicationAuthRes,
         ProtoOAAccountAuthReq, ProtoOAAccountAuthRes,
@@ -81,12 +83,23 @@ try:
         ProtoOASpotEvent, ProtoOATraderUpdatedEvent,
         ProtoOANewOrderReq, ProtoOAExecutionEvent,
         ProtoOAErrorRes,
-        # Specific message types for deserialization
         ProtoOAGetCtidProfileByTokenRes,
         ProtoOAGetCtidProfileByTokenReq
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import ProtoOATrader
     USE_OPENAPI_LIB = True
+    print("Successfully imported all required cTrader Open API messages and enums.")
+    # ---- DEBUG PRINTS START ----
+    try:
+        print(f"DEBUG: Type of ProtoOAPayloadType is: {type(ProtoOAPayloadType)}")
+        print(f"DEBUG: dir(ProtoOAPayloadType) is: {dir(ProtoOAPayloadType)}")
+        if hasattr(ProtoOAPayloadType, 'OA_APPLICATION_AUTH_RES'):
+            print(f"DEBUG: ProtoOAPayloadType.OA_APPLICATION_AUTH_RES exists. Value: {ProtoOAPayloadType.OA_APPLICATION_AUTH_RES}")
+        else:
+            print("DEBUG: ProtoOAPayloadType.OA_APPLICATION_AUTH_RES does NOT exist.")
+    except NameError:
+        print("DEBUG: ProtoOAPayloadType is not even defined at the point of debug prints (should not happen if import succeeded).")
+    # ---- DEBUG PRINTS END ----
 except ImportError as e:
     print(f"ctrader-open-api import failed ({e}); running in mock mode.")
     USE_OPENAPI_LIB = False
