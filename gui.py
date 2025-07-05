@@ -2,7 +2,7 @@ import time
 import threading
 import tkinter as tk
 import queue
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from trading import Trader  # adjust import path if needed
 from strategies import (
     SafeStrategy, ModerateStrategy, AggressiveStrategy,
@@ -94,13 +94,44 @@ class SettingsPage(ttk.Frame):
         # No specific FIX params to re-init on the Trader for OpenAPI
         t.settings = self.controller.settings
 
-        if t.connect():
-            self.status.config(text="Connecting...", foreground="orange")
-            self.after(100, self._check_connection)
-        else:
-            _, msg = t.get_connection_status()
-            messagebox.showerror("Connection Failed", msg)
-            self.status.config(text=f"Failed: {msg}", foreground="red")
+        # Trader.connect() now handles the entire OAuth flow internally (blocking)
+        # and then starts the client service if successful.
+        # It returns True if token exchange and client service start were successful, False otherwise.
+
+        # To prevent GUI freeze during the blocking connect() call (which includes
+        # waiting for browser auth and http server), run it in a thread.
+
+        # Initial status update
+        self.status.config(text="Processing connection...", foreground="orange")
+
+        def _connect_thread_target():
+            # This runs in the worker thread
+            # t.connect() is blocking and will try various connection stages.
+            # It internally updates t._last_error which can be fetched if it returns False.
+
+            # For more granular updates *during* t.connect(), t.connect() would need
+            # to accept a callback, or the GUI would need to poll t.get_connection_status()
+            # if t.connect() was made non-blocking and stateful.
+            # Given current structure, we update before and after the blocking call.
+
+            if t.connect(): # This blocks, then attempts to start client service
+                # If connect() returns True, it means token was obtained/refreshed/validated
+                # and the client service has started.
+                # Now we can start polling for App/Account Auth completion from Spotware.
+                self.after(0, lambda: self.status.config(text="Connection successful. Authenticating account...", foreground="orange"))
+                self.after(100, self._check_connection) # Start polling for actual connection status
+            else:
+                # connect() returned False. An error occurred.
+                # trader._last_error should have the details of what failed.
+                _, msg = t.get_connection_status()
+                final_msg = f"Failed: {msg}" if msg else "Connection failed."
+
+                self.after(0, lambda: messagebox.showerror("Connection Failed", final_msg))
+                self.after(0, lambda: self.status.config(text=final_msg, foreground="red"))
+
+        connect_thread = threading.Thread(target=_connect_thread_target, daemon=True)
+        connect_thread.start()
+
 
     # Poll connection status until connected or error
     def _check_connection(self):
