@@ -349,13 +349,43 @@ class Trader:
         if not self._ensure_valid_token():
             return # Token refresh failed or no token, error set by _ensure_valid_token
 
-        print(f"Requesting AccountAuth for {ctid}")
+        print(f"Requesting AccountAuth for {ctid} with token: {self._access_token[:20]}...") # Log token used
         req = ProtoOAAccountAuthReq()
         req.ctidTraderAccountId = ctid
         req.accessToken = self._access_token or "" # Should be valid now
-        d = self._client.send(req)
-        # Only error callback; normal messages handled in _on_message_received
-        d.addErrback(self._handle_send_error)
+
+        print(f"Sending ProtoOAAccountAuthReq for ctid: {ctid}")
+        try:
+            d = self._client.send(req)
+            print(f"Deferred created for AccountAuthReq: {d}")
+
+            def success_callback(response_msg):
+                # This callback is mostly for confirming the Deferred fired successfully.
+                # Normal processing will happen in _on_message_received if message is dispatched.
+                print(f"AccountAuthReq success_callback triggered. Response type: {type(response_msg)}. Will be handled by _on_message_received.")
+                # Note: We don't directly process response_msg here as _on_message_received should get it.
+
+            def error_callback(failure_reason):
+                print(f"AccountAuthReq error_callback triggered. Failure:")
+                # Print a summary of the failure, and the full traceback if it's an exception
+                if hasattr(failure_reason, 'getErrorMessage'):
+                    print(f"  Error Message: {failure_reason.getErrorMessage()}")
+                if hasattr(failure_reason, 'getTraceback'):
+                    print(f"  Traceback: {failure_reason.getTraceback()}")
+                else:
+                    print(f"  Failure object: {failure_reason}")
+                self._handle_send_error(failure_reason) # Ensure our existing error handler is called
+
+            d.addCallbacks(success_callback, errback=error_callback)
+            print("Added callbacks to AccountAuthReq Deferred.")
+
+        except Exception as e:
+            print(f"Exception during _send_account_auth_request send command: {e}")
+            self._last_error = f"Exception sending AccountAuth: {e}"
+            # Potentially stop client if send itself fails critically
+            if self._client and self._is_client_connected:
+                self._client.stopService()
+                self.is_connected = False # Ensure state reflects this
 
     def _send_get_account_list_request(self) -> None:
         if not self._ensure_valid_token():
