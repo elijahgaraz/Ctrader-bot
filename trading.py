@@ -66,11 +66,15 @@ import json # For token persistence
 # Imports from ctrader-open-api
 try:
     from ctrader_open_api import Client, TcpProtocol, EndPoints
+    # from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import ProtoPayloadType # Keep this commented for now
+    from ctrader_open_api.messages import OpenApiCommonMessages_pb2 # Import the module
+    ProtoPayloadType = OpenApiCommonMessages_pb2.ProtoPayloadType # Try accessing as attribute
+
     from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import (
         ProtoHeartbeatEvent,
         ProtoErrorRes,
-        ProtoMessage,
-        ProtoPayloadType # Corrected Enum name based on file content
+        ProtoMessage
+        # ProtoPayloadType removed from here for the test
     )
     from ctrader_open_api.messages.OpenApiMessages_pb2 import (
         ProtoOAApplicationAuthReq, ProtoOAApplicationAuthRes,
