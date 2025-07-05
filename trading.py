@@ -196,33 +196,7 @@ class Trader:
             except OSError as rm_err:
                 print(f"Error removing corrupted token file: {rm_err}")
 
-
-    def _load_tokens_from_file(self):
-        """
-        Loads OAuth access token, refresh token, and expiry time from TOKEN_FILE_PATH.
-        Sets the corresponding instance attributes if tokens are found and loaded.
-        """
-        try:
-            with open(TOKEN_FILE_PATH, "r") as f:
-                tokens = json.load(f)
-            self._access_token = tokens.get("access_token")
-            self._refresh_token = tokens.get("refresh_token")
-            self._token_expires_at = tokens.get("token_expires_at")
-            if self._access_token:
-                print(f"Tokens loaded from {TOKEN_FILE_PATH}. Access token: {self._access_token[:20]}...")
-            else:
-                print(f"{TOKEN_FILE_PATH} not found or no access token in it. Will need OAuth.")
-        except FileNotFoundError:
-            print(f"Token file {TOKEN_FILE_PATH} not found. New OAuth flow will be required.")
-        except (IOError, json.JSONDecodeError) as e:
-            print(f"Error loading tokens from {TOKEN_FILE_PATH}: {e}. Will need OAuth flow.")
-            # In case of corrupted file, good to try to remove it or back it up
-            try:
-                import os
-                os.remove(TOKEN_FILE_PATH) # Ensure os is imported if this is the only place
-                print(f"Removed corrupted token file: {TOKEN_FILE_PATH}")
-            except OSError as rm_err:
-                print(f"Error removing corrupted token file: {rm_err}")
+    # Removed duplicated _load_tokens_from_file method. The first one (lines 189-206 in provided file) is kept.
 
     def _next_message_id(self) -> str:
         mid = str(self._message_id_counter)
